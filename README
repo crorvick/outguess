@@ -1,6 +1,6 @@
-OutGuess 0.13
--------------
-1999-07-18 - Niels Provos <provos@citi.umich.edu>
+OutGuess 0.13b
+--------------
+1999-08-06 - Niels Provos <provos@citi.umich.edu>
 
 OutGuess is a universal steganographic tool that allows the insertion
 of hidden information into the redundant bits of data sources.  The
@@ -12,7 +12,8 @@ will be used as concrete example of data objects, though OutGuess can
 use any kind of data, as long as a handler is provided.
 
 OutGuess is available under the BSD software license.  Please see each
-source file for its respective license.  OutGuess was written in Germany.
+source file for its respective license.  OutGuess was written in
+Germany, and CONTAINS CRYPTOGRAPHIC FUNCTIONS.
 
 Steganography is the art of hiding the fact that communication is
 happening. Classical steganography systems depend on keeping the
@@ -107,7 +108,9 @@ Other options that apply to the general executions of OutGuess are
 		100.  The higher the quality the more bits to hide 
 		a message in the data are available.
 
-  -t		Collect statistics about redundant bit usage.
+  -t		Collect statistics about redundant bit usage. Repeated
+		't's increase output level.  Probably meaningless to
+		most.
 
 For embedding messages, you need to specify a source and a destination
 filename.  OutGuess determines the data format by the filename extension.

@@ -61,11 +61,15 @@ static int jpeg_state;
 static bitmap tbitmap;
 static u_int32_t off;
 static int quality = 75;
+static int jpeg_eval;
+static int eval_cnt;
 
 void
-init_state(int state, bitmap *bitmap)
+init_state(int state, int eval, bitmap *bitmap)
 {
 	jpeg_state = state;
+	jpeg_eval = eval;
+	eval_cnt = 0;
 
 	off = 0;
 	if (state == JPEG_READING) {
@@ -83,6 +87,9 @@ bitmap *
 finish_state(void)
 {
 	bitmap *pbitmap;
+
+	if (jpeg_eval)
+		fprintf(stderr, "\n");
 
 	if (jpeg_state != JPEG_READING)
 		return NULL;
@@ -104,7 +111,7 @@ short
 steg_use_bit (unsigned short temp)
 {
 	if ((temp & 0x1) == temp)
-		return temp;
+		goto steg_end;
 
 	switch (jpeg_state) {
 	case JPEG_READING:
@@ -136,13 +143,23 @@ steg_use_bit (unsigned short temp)
 			}
 			tbitmap.detect = buf;
 		}
-
-		return temp;
+		break;
 	default:
 		temp = (temp & ~0x1) | (TEST_BIT(tbitmap.bitmap, off) ? 1 : 0);
 		off++;
-		return temp;
+
+		break;
 	}
+
+ steg_end:
+	if (jpeg_eval) {
+		if (eval_cnt % DCTSIZE2 == 0)
+			fprintf(stderr, "\n%.7d: ", eval_cnt);
+		fprintf(stderr, "% .3d,", (short) temp);
+		eval_cnt++;
+	}
+
+	return temp;
 }
 
 void
@@ -185,7 +202,7 @@ bitmap_from_jpg(bitmap *dbitmap, image *image, int flags)
 void
 bitmap_to_jpg(image *image, bitmap *bitmap, int flags)
 {
-	init_state(JPEG_WRITING, bitmap);
+	init_state(JPEG_WRITING, steg_stat >= 3 ? 1 : 0, bitmap);
 }
 
 /******************** JPEG COMPRESSION SAMPLE INTERFACE *******************/
@@ -226,7 +243,7 @@ compress_JPEG (image *image)
   JSAMPROW row_pointer[1];	/* pointer to JSAMPLE row[s] */
   int row_stride;		/* physical row width in image buffer */
 
-  init_state(JPEG_READING, NULL);
+  init_state(JPEG_READING, steg_stat >= 3 ? 1 : 0, NULL);
 
   cinfo.err = jpeg_std_error(&jerr);
   jpeg_create_compress(&cinfo);
@@ -436,7 +453,7 @@ read_JPEG_file (FILE *infile)
   JSAMPARRAY buffer;		/* Output row buffer */
   int row_stride;		/* physical row width in output buffer */
 
-  init_state(JPEG_READING, NULL);
+  init_state(JPEG_READING, 0, NULL);
 
   image = checkedmalloc(sizeof(*image));
   memset(image, 0, sizeof(*image));

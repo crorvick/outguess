@@ -1,3 +1,9 @@
+OutGuess 0.13b
+--------------
+1999-08-06 - Niels Provos <provos@citi.umich.edu>
+ - Add additional statistics for analysis purposes.
+ - Fix a bug that changed bits in searching mode.
+
 OutGuess 0.13
 -------------
 1999-07-18 - Niels Provos <provos@citi.umich.edu>

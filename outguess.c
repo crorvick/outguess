@@ -84,6 +84,10 @@ static int steg_count;
 static int steg_mis;
 static int steg_mod;
 
+/* Exported variables */
+
+int steg_stat;
+
 /* format handlers */
 
 handler *handlers[] = {
@@ -377,7 +381,7 @@ iterator_adapt(iterator *iter, bitmap *bitmap, int datalen)
  */
 
 void
-steg_adjust_errors(bitmap *bitmap)
+steg_adjust_errors(bitmap *bitmap, int flags)
 {
 	int i, j, n, many, flag; 
 	int priority[ERRORBITS], detect[ERRORBITS];
@@ -415,10 +419,12 @@ steg_adjust_errors(bitmap *bitmap)
 	}
 
 	for (i = 0; i < j; i++) {
-		if (TEST_BIT(bitmap->bitmap, priority[i]))
-			WRITE_BIT(bitmap->bitmap, i, 0);
-		else
-			WRITE_BIT(bitmap->bitmap, i, 1);
+		if (flags & STEG_EMBED) {
+			if (TEST_BIT(bitmap->bitmap, priority[i]))
+				WRITE_BIT(bitmap->bitmap, i, 0);
+			else
+				WRITE_BIT(bitmap->bitmap, i, 1);
+		}
 		steg_mis--;
 		steg_mod -= detect[i];
 	}
@@ -434,7 +440,7 @@ steg_embedchunk(bitmap *bitmap, iterator *iter,
 	while (i < bitmap->bits && bits) {
 		if ((embed & STEG_ERROR) && !steg_encoded) {
 			if (steg_err_cnt > 0)
-				steg_adjust_errors(bitmap);
+				steg_adjust_errors(bitmap, embed);
 			steg_encoded = CODEBITS;
 			steg_errors = 0;
 			steg_err_cnt = 0;
@@ -550,7 +556,7 @@ steg_embed(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 
 	/* Final error adjustion after end */
 	if ((embed & STEG_ERROR) && steg_err_cnt > 0)
-	  steg_adjust_errors(bitmap);
+	  steg_adjust_errors(bitmap, embed);
 
 	if (embed & STEG_EMBED)
 		fprintf(stderr, "Bits embedded: %d, changed: %d(%2.1f%%), "
@@ -646,7 +652,7 @@ steg_find(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 	  int siter, int siterstart,
 	  u_char *data, int datalen, int flags)
 {
-	int changed, tch, half;
+	int changed, tch, half, chmax, chmin;
 	int j, i, size = 0;
 	struct arc4_stream tas;
 	iterator titer;
@@ -659,7 +665,7 @@ steg_find(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 		siter = DEFAULT_ITER;
 
 	if (siter && siterstart < siter) {
-		if (flags & STEG_STATS) {
+		if (steg_stat) {
 			/* Collect stats about changed bit */
 			size = siter - siterstart;
 			chstats = checkedmalloc(size * sizeof(u_int16_t));
@@ -667,7 +673,7 @@ steg_find(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 		}
 
 		fprintf(stderr, "Finding best embedding...\n");
-		changed = -1; j = -STEG_ERR_HEADER;
+		changed = chmin = chmax = -1; j = -STEG_ERR_HEADER;
 
 		for (i = siterstart; i < siter; i++) {
 			titer = *iter;
@@ -682,8 +688,13 @@ steg_find(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 
 			tch = result.changed + result.bias;
 
-			if (flags & STEG_STATS)
+			if (steg_stat)
 				chstats[i - siterstart] = result.changed;
+
+			if (chmax == -1 || result.changed > chmax)
+				chmax = result.changed;
+			if (chmin == -1 || result.changed < chmin)
+				chmin = result.changed;
 
 			if (changed == -1 || tch < changed) {
 				changed = tch;
@@ -697,14 +708,21 @@ steg_find(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 			}
 		}
 
-		if (flags & STEG_STATS) {
+		if (steg_stat && (chmax - chmin > 1)) {
 			double mean = 0, dev, sq;
-			int cnt = 0;
+			int cnt = 0, count = chmax - chmin + 1;
+			u_int16_t *chtab;
+			int chtabcnt = 0;
+
+			chtab = checkedmalloc(count * sizeof(u_int16_t));
+			memset(chtab, 0, count * sizeof(u_int16_t));
 
 			for (i = 0; i < size; i++)
 				if (chstats[i] > 0) {
 					mean += chstats[i];
 					cnt++;
+					chtab[chstats[i] - chmin]++;
+					chtabcnt++;
 				}
 
 			mean = mean / cnt;
@@ -715,8 +733,22 @@ steg_find(bitmap *bitmap, iterator *iter, struct arc4_stream *as,
 					dev += sq * sq;
 				}
 
-			fprintf(stderr, "Changed bits. Mean: %f, +- %f\n",
-				mean, cnt > 1 ? sqrt(dev / (cnt - 1)) : 0);
+			fprintf(stderr, "Changed bits. Min: %d, Mean: %f, +- %f, Max: %d\n",
+				chmin,
+				mean, sqrt(dev / (cnt - 1)),
+				chmax);
+
+			if (steg_stat > 1)
+				for (i = 0; i < count; i++) {
+					if (!chtab[i])
+						continue;
+					fprintf(stderr, "%d: %.9f\n",
+						chmin + i,
+						(double)chtab[i]/chtabcnt);
+				}
+
+			free (chtab);
+			free (chstats);
 		}
 
 		fprintf(stderr, "%d, %d: ", j, changed);
@@ -918,7 +950,7 @@ munmap_file(u_char *data, int len)
 int
 main(int argc, char **argv)
 {
-	char version[] = "OutGuess 0.13 Universal Stego (c) 1999 Niels Provos";
+	char version[] = "OutGuess 0.13b Universal Stego (c) 1999 Niels Provos";
 	char usage[] = "%s\n\n%s [options] [<input file> [<output file>]]\n"
 		"\t-[sS] <n>    iteration start, capital letter for 2nd dataset\n"
 		"\t-[iI] <n>    iteration limit\n"
@@ -955,6 +987,8 @@ main(int argc, char **argv)
 	char dofourier = 0;
 #endif /* FOURIER */
 
+	steg_stat = 0;
+
 	/* read command line arguments */
 	while ((ch = getopt(argc, argv, "eErmftp:s:S:i:I:k:d:D:K:x:")) != -1)
 		switch((char)ch) {
@@ -981,7 +1015,7 @@ main(int argc, char **argv)
 			doretrieve = 1;
 			break;
 		case 't':
-			flags |= STEG_STATS;
+			steg_stat++;
 			break;
 		case 's':
 			siterstart = atoi(optarg);
@@ -1068,7 +1102,7 @@ main(int argc, char **argv)
 	if (doerror)
 		flags |= STEG_ERROR;
     
-	fprintf(stderr, "Reading ....\n");
+	fprintf(stderr, "Reading %s....\n", argv[0]);
 	image = srch->read(fin);
 	fprintf(stderr, "Extracting usable bits ...\n");
 	if (doretrieve)
@@ -1180,7 +1214,7 @@ main(int argc, char **argv)
 				  image->img);
 #endif /* FOURIER */
 
-		fprintf(stderr, "Writing ....\n");
+		fprintf(stderr, "Writing %s....\n", argv[1]);
 		dsth->write(fout, image);
 	} else {
 		encdata = steg_retrieve(&datalen, &bitmap, &iter, &as, flags);

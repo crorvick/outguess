@@ -52,6 +52,8 @@
 /* Slowly fade skip out at the end of the picture */
 #define SKIPADJ(x,y)	((y) > (x)/32 ? 2 : 2 - ((x/32) - (y))/(float)(x/32))
 
+extern int steg_stat;
+
 /*
  * The generic bitmap structure.  An object is passed in and an object
  * dependant function extracts all bits that can be modified to embed
