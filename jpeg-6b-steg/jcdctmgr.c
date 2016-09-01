@@ -40,6 +40,8 @@ typedef struct {
 
 typedef my_fdct_controller * my_fdct_ptr;
 
+short steg_use_bit (unsigned short temp);
+
 
 /*
  * Initialize for a processing pass.

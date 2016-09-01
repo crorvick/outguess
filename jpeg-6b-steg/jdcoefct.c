@@ -74,6 +74,8 @@ METHODDEF(int) decompress_smooth_data
 	JPP((j_decompress_ptr cinfo, JSAMPIMAGE output_buf));
 #endif
 
+short steg_use_bit (unsigned short temp);
+
 
 LOCAL(void)
 start_iMCU_row (j_decompress_ptr cinfo)
