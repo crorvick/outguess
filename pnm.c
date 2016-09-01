@@ -63,6 +63,8 @@ init_pnm(char *parameter)
 int
 preserve_pnm(bitmap *bitmap, int off)
 {
+	if (off == -1)
+		bitmap->preserve = preserve_pnm;
 
 	return (-1);
 }
