@@ -692,8 +692,8 @@ do_embed(bitmap *bitmap, u_char *filename, u_char *key, u_int klen,
 	}
 	if (bitmap->maxcorrect && correctlen > bitmap->maxcorrect) {
 		fprintf(stderr, "steg_embed: "
-			"message larger than correctable size %d > %d\n",
-			(int)correctlen, (int)bitmap->maxcorrect);
+			"message larger than correctable size %zu > %zu\n",
+			correctlen, bitmap->maxcorrect);
 		exit(1);
 	}
 
@@ -974,8 +974,8 @@ main(int argc, char **argv)
 			dsth->preserve(&bitmap, -1);
 			if (bitmap.maxcorrect)
 				fprintf(stderr,
-					"Correctable message size: %d bits, %0.2f%%\n",
-					(int)bitmap.maxcorrect,
+					"Correctable message size: %zu bits, %0.2f%%\n",
+					bitmap.maxcorrect,
 					(float)100*bitmap.maxcorrect/bitmap.bits);
 		}
 
